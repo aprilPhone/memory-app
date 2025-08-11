@@ -409,32 +409,22 @@ export default function MemoryDetailPage() {
 
             {/* URL Link */}
             {memory.url && (
-              <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-                <h3 className="text-xl font-semibold mb-4 text-foreground">
-                  🔗 Link
-                </h3>
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <ExternalLink className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {memory.url}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        External link
-                      </p>
-                    </div>
+              <div className="mt-6 bg-card border border-border rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground truncate max-w-xs">
+                      {memory.url}
+                    </span>
                   </div>
-                  <Button asChild>
+                  <Button variant="outline" size="sm" asChild>
                     <a
                       href={memory.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-1"
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      <ExternalLink className="h-3 w-3" />
                       {t("common.open")}
                     </a>
                   </Button>
