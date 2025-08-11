@@ -1,10 +1,10 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { Plus, Edit, Trash2, Search, Heart } from "lucide-react";
+import { Plus, Edit, Trash2, Search } from "lucide-react";
 import {
   SidebarProvider,
   SidebarInset,
@@ -37,9 +37,7 @@ interface Memory {
   content: string;
   type: string;
   fileUrl?: string;
-  originalFileName?: string;
   url?: string;
-  isFavorite: boolean;
   createdAt: string;
   category: {
     name: string;
@@ -48,15 +46,52 @@ interface Memory {
   };
 }
 
-export default function Home() {
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export default function CategoryPage() {
   const { data: session, status } = useSession();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [filteredMemories, setFilteredMemories] = useState<Memory[]>([]);
+  const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
+  const params = useParams();
+  const categoryId = params?.id as string;
   const { t } = useTranslations();
+
+  const fetchCategoryAndMemories = useCallback(async () => {
+    try {
+      // Fetch memories for the specific category
+      const response = await fetch(`/api/categories/${categoryId}/memories`);
+
+      if (response.ok) {
+        const data = await response.json();
+        setCategory(data.category);
+        setMemories(data.memories);
+        setFilteredMemories(data.memories);
+      } else if (response.status === 404) {
+        // Category not found, redirect to home
+        router.push("/");
+        return;
+      } else {
+        const errorData = await response.json();
+        console.error("Failed to fetch category data:", errorData);
+        alert(`Error: ${errorData.error || "Failed to load category"}`);
+      }
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+      alert("Failed to connect to server. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryId, router]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -66,23 +101,8 @@ export default function Home() {
       return;
     }
 
-    fetchMemories();
-  }, [session, status, router]);
-
-  const fetchMemories = async () => {
-    try {
-      const response = await fetch("/api/memories");
-      if (response.ok) {
-        const data = await response.json();
-        setMemories(data);
-        setFilteredMemories(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch memories:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchCategoryAndMemories();
+  }, [session, status, router, categoryId, fetchCategoryAndMemories]);
 
   // Search effect
   useEffect(() => {
@@ -96,7 +116,6 @@ export default function Home() {
       (memory) =>
         memory.title.toLowerCase().includes(query) ||
         memory.content.toLowerCase().includes(query) ||
-        memory.category.name.toLowerCase().includes(query) ||
         memory.type.toLowerCase().includes(query)
     );
     setFilteredMemories(filtered);
@@ -123,9 +142,6 @@ export default function Home() {
               memory.content
                 .toLowerCase()
                 .includes(searchQuery.toLowerCase()) ||
-              memory.category.name
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase()) ||
               memory.type.toLowerCase().includes(searchQuery.toLowerCase())
           )
         );
@@ -138,55 +154,6 @@ export default function Home() {
       alert("Failed to delete memory");
     } finally {
       setDeleting(null);
-    }
-  };
-
-  const handleToggleFavorite = async (
-    memoryId: string,
-    isFavorite: boolean
-  ) => {
-    try {
-      const response = await fetch("/api/favorites", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          memoryId,
-          isFavorite: !isFavorite,
-        }),
-      });
-
-      if (response.ok) {
-        const updatedMemory = await response.json();
-        // Update memory in state
-        const updatedMemories = memories.map((memory) =>
-          memory.id === memoryId
-            ? { ...memory, isFavorite: updatedMemory.isFavorite }
-            : memory
-        );
-        setMemories(updatedMemories);
-        setFilteredMemories(
-          updatedMemories.filter(
-            (memory) =>
-              !searchQuery.trim() ||
-              memory.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              memory.content
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase()) ||
-              memory.category.name
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase()) ||
-              memory.type.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        );
-      } else {
-        const error = await response.json();
-        alert(error.error || "Failed to update favorite status");
-      }
-    } catch (error) {
-      console.error("Error updating favorite status:", error);
-      alert("Failed to update favorite status");
     }
   };
 
@@ -208,14 +175,19 @@ export default function Home() {
     );
   }
 
+  if (!category) {
+    return null;
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
-          <div className="flex-1">
-            <h1 className="text-2xl font-semibold">{t("nav.allMemories")}</h1>
+          <div className="flex-1 flex items-center gap-3">
+            <span className="text-2xl">{category.icon}</span>
+            <h1 className="text-2xl font-semibold">{category.name}</h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -229,7 +201,7 @@ export default function Home() {
               />
             </div>
             <Button asChild>
-              <Link href="/memories/new">
+              <Link href={`/memories/new?category=${categoryId}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 {t("home.createMemory")}
               </Link>
@@ -247,7 +219,7 @@ export default function Home() {
             </div>
           ) : filteredMemories.length === 0 && !searchQuery.trim() ? (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">📝</div>
+              <div className="text-6xl mb-4">{category.icon}</div>
               <h2 className="text-xl font-semibold text-foreground mb-2">
                 {t("home.noMemories")}
               </h2>
@@ -255,7 +227,7 @@ export default function Home() {
                 {t("home.noMemoriesDesc")}
               </p>
               <Button asChild>
-                <Link href="/memories/new">
+                <Link href={`/memories/new?category=${categoryId}`}>
                   <Plus className="h-4 w-4 mr-2" />
                   {t("home.createMemory")}
                 </Link>
@@ -268,7 +240,8 @@ export default function Home() {
                 {t("home.noMemories")}
               </h2>
               <p className="text-muted-foreground mb-6">
-                {t("favorites.noFavoritesDesc")} &quot;{searchQuery}&quot;
+                {t("favorites.noFavoritesDesc")} &quot;
+                {searchQuery}&quot;
               </p>
               <Button variant="outline" onClick={() => setSearchQuery("")}>
                 {t("home.clearSearch")}
@@ -281,7 +254,7 @@ export default function Home() {
                   {t("home.found")} {filteredMemories.length} memory
                   {filteredMemories.length !== 1 ? "s" : ""}{" "}
                   {t("home.memoriesFor")} &quot;
-                  {searchQuery}&quot;
+                  {searchQuery}&quot; in {category.name}
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -305,24 +278,6 @@ export default function Home() {
                           className="flex gap-1"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleToggleFavorite(memory.id, memory.isFavorite)
-                            }
-                            className={`h-8 w-8 p-0 ${
-                              memory.isFavorite
-                                ? "text-red-500 hover:text-red-600 hover:bg-red-50"
-                                : "text-gray-400 hover:text-red-500 hover:bg-red-50"
-                            }`}
-                          >
-                            <Heart
-                              className={`h-4 w-4 ${
-                                memory.isFavorite ? "fill-current" : ""
-                              }`}
-                            />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

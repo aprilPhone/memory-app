@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,23 @@ interface Category {
   color: string;
 }
 
+interface Memory {
+  id: string;
+  title: string;
+  content: string;
+  type: string;
+  fileUrl?: string;
+  originalFileName?: string;
+  url?: string;
+  createdAt: string;
+  categoryId: string;
+  category: {
+    name: string;
+    icon: string;
+    color: string;
+  };
+}
+
 interface UploadedFile {
   filename: string;
   fileUrl: string;
@@ -39,14 +56,16 @@ interface UploadedFile {
   type: string;
 }
 
-export default function NewMemoryPage() {
+export default function EditMemoryPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const preselectedCategoryId = searchParams?.get("category");
+  const params = useParams();
+  const memoryId = params?.id as string;
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [memory, setMemory] = useState<Memory | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
 
@@ -66,28 +85,54 @@ export default function NewMemoryPage() {
       return;
     }
 
-    fetchCategories();
-  }, [session, status, router]);
+    fetchMemoryAndCategories();
+  }, [session, status, router, memoryId]);
 
-  const fetchCategories = async () => {
+  const fetchMemoryAndCategories = async () => {
     try {
-      const response = await fetch("/api/categories");
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
+      // Fetch categories and memory data in parallel
+      const [categoriesResponse, memoriesResponse] = await Promise.all([
+        fetch("/api/categories"),
+        fetch("/api/memories"),
+      ]);
 
-        // Set category based on URL parameter or default to first category
-        if (
-          preselectedCategoryId &&
-          data.some((cat: Category) => cat.id === preselectedCategoryId)
-        ) {
-          setCategoryId(preselectedCategoryId);
-        } else if (data.length > 0) {
-          setCategoryId(data[0].id);
+      if (categoriesResponse.ok) {
+        const categoriesData = await categoriesResponse.json();
+        setCategories(categoriesData);
+      }
+
+      if (memoriesResponse.ok) {
+        const memoriesData = await memoriesResponse.json();
+        const foundMemory = memoriesData.find((m: Memory) => m.id === memoryId);
+
+        if (foundMemory) {
+          setMemory(foundMemory);
+          setTitle(foundMemory.title);
+          setContent(foundMemory.content);
+          setType(foundMemory.type);
+          setCategoryId(foundMemory.categoryId);
+          setUrl(foundMemory.url || "");
+
+          // If memory has a file, set it up
+          if (foundMemory.fileUrl) {
+            // Create a mock uploaded file object for display
+            setUploadedFile({
+              filename: foundMemory.fileUrl.split("/").pop() || "file",
+              fileUrl: foundMemory.fileUrl,
+              originalName: foundMemory.fileUrl.split("/").pop() || "file",
+              size: 0, // We don't have the original size
+              type: foundMemory.type,
+            });
+          }
+        } else {
+          // Memory not found, redirect to home
+          router.push("/");
         }
       }
     } catch (error) {
-      console.error("Failed to fetch categories:", error);
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -165,11 +210,12 @@ export default function NewMemoryPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/memories", {
-        method: "POST",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          id: memoryId,
           title: title.trim(),
           content: content.trim(),
           type,
@@ -184,17 +230,17 @@ export default function NewMemoryPage() {
         router.push("/");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to create memory");
+        alert(error.error || "Failed to update memory");
       }
     } catch (error) {
-      console.error("Error creating memory:", error);
-      alert("Failed to create memory");
+      console.error("Error updating memory:", error);
+      alert("Failed to update memory");
     } finally {
       setLoading(false);
     }
   };
 
-  if (status === "loading" || !session) {
+  if (status === "loading" || initialLoading) {
     return (
       <SidebarProvider>
         <AppSidebar />
@@ -210,6 +256,10 @@ export default function NewMemoryPage() {
         </SidebarInset>
       </SidebarProvider>
     );
+  }
+
+  if (!session || !memory) {
+    return null;
   }
 
   return (
@@ -232,10 +282,8 @@ export default function NewMemoryPage() {
           <div className="max-w-2xl mx-auto">
             <Card>
               <CardHeader>
-                <CardTitle>{t("form.createMemory")}</CardTitle>
-                <CardDescription>
-                  Capture your thoughts, experiences, and important moments
-                </CardDescription>
+                <CardTitle>{t("form.updateMemory")}</CardTitle>
+                <CardDescription>Update your memory details</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -268,16 +316,6 @@ export default function NewMemoryPage() {
                         </option>
                       ))}
                     </select>
-                    {categories.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        <Link
-                          href="/categories/new"
-                          className="text-primary hover:underline"
-                        >
-                          {t("form.createCategory")}
-                        </Link>
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -335,9 +373,12 @@ export default function NewMemoryPage() {
                             <p className="font-medium">
                               {uploadedFile.originalName}
                             </p>
-                            <p className="text-sm text-muted-foreground">
-                              {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
+                            {uploadedFile.size > 0 && (
+                              <p className="text-sm text-muted-foreground">
+                                {(uploadedFile.size / 1024 / 1024).toFixed(2)}{" "}
+                                MB
+                              </p>
+                            )}
                           </div>
                           <Button
                             type="button"
@@ -363,7 +404,7 @@ export default function NewMemoryPage() {
                       }
                       className="flex-1"
                     >
-                      {loading ? t("form.creating") : t("form.createMemory")}
+                      {loading ? t("form.updating") : t("form.updateMemory")}
                     </Button>
                     <Button type="button" variant="outline" asChild>
                       <Link href="/">{t("common.cancel")}</Link>

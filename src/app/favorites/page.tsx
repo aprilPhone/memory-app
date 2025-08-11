@@ -48,7 +48,7 @@ interface Memory {
   };
 }
 
-export default function Home() {
+export default function FavoritesPage() {
   const { data: session, status } = useSession();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [filteredMemories, setFilteredMemories] = useState<Memory[]>([]);
@@ -66,19 +66,19 @@ export default function Home() {
       return;
     }
 
-    fetchMemories();
+    fetchFavoriteMemories();
   }, [session, status, router]);
 
-  const fetchMemories = async () => {
+  const fetchFavoriteMemories = async () => {
     try {
-      const response = await fetch("/api/memories");
+      const response = await fetch("/api/favorites");
       if (response.ok) {
         const data = await response.json();
         setMemories(data);
         setFilteredMemories(data);
       }
     } catch (error) {
-      console.error("Failed to fetch memories:", error);
+      console.error("Failed to fetch favorite memories:", error);
     } finally {
       setLoading(false);
     }
@@ -158,28 +158,12 @@ export default function Home() {
       });
 
       if (response.ok) {
-        const updatedMemory = await response.json();
-        // Update memory in state
-        const updatedMemories = memories.map((memory) =>
-          memory.id === memoryId
-            ? { ...memory, isFavorite: updatedMemory.isFavorite }
-            : memory
+        // Remove from favorites list since we're unfavoriting
+        const updatedMemories = memories.filter(
+          (memory) => memory.id !== memoryId
         );
         setMemories(updatedMemories);
-        setFilteredMemories(
-          updatedMemories.filter(
-            (memory) =>
-              !searchQuery.trim() ||
-              memory.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              memory.content
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase()) ||
-              memory.category.name
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase()) ||
-              memory.type.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        );
+        setFilteredMemories(updatedMemories);
       } else {
         const error = await response.json();
         alert(error.error || "Failed to update favorite status");
@@ -215,7 +199,7 @@ export default function Home() {
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <div className="flex-1">
-            <h1 className="text-2xl font-semibold">{t("nav.allMemories")}</h1>
+            <h1 className="text-2xl font-semibold">{t("favorites.title")}</h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -240,47 +224,45 @@ export default function Home() {
         <main className="flex-1 p-6">
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-2 text-muted-foreground">
-                {t("common.loading")}
-              </p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading favorite memories...</p>
             </div>
           ) : filteredMemories.length === 0 && !searchQuery.trim() ? (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">📝</div>
-              <h2 className="text-xl font-semibold text-foreground mb-2">
-                {t("home.noMemories")}
+              <div className="text-6xl mb-4">💖</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                No favorite memories yet
               </h2>
-              <p className="text-muted-foreground mb-6">
-                {t("home.noMemoriesDesc")}
+              <p className="text-gray-600 mb-6">
+                Mark memories as favorites to see them here!
               </p>
               <Button asChild>
-                <Link href="/memories/new">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t("home.createMemory")}
+                <Link href="/">
+                  <Heart className="h-4 w-4 mr-2" />
+                  Browse all memories
                 </Link>
               </Button>
             </div>
           ) : filteredMemories.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🔍</div>
-              <h2 className="text-xl font-semibold text-foreground mb-2">
-                {t("home.noMemories")}
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                No favorites found
               </h2>
-              <p className="text-muted-foreground mb-6">
-                {t("favorites.noFavoritesDesc")} &quot;{searchQuery}&quot;
+              <p className="text-gray-600 mb-6">
+                No favorite memories match your search query &quot;{searchQuery}
+                &quot;
               </p>
               <Button variant="outline" onClick={() => setSearchQuery("")}>
-                {t("home.clearSearch")}
+                Clear search
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
               {searchQuery.trim() && (
-                <div className="text-sm text-muted-foreground">
-                  {t("home.found")} {filteredMemories.length} memory
-                  {filteredMemories.length !== 1 ? "s" : ""}{" "}
-                  {t("home.memoriesFor")} &quot;
+                <div className="text-sm text-gray-600">
+                  Found {filteredMemories.length} favorite memory
+                  {filteredMemories.length !== 1 ? "s" : ""} for &quot;
                   {searchQuery}&quot;
                 </div>
               )}
@@ -297,7 +279,7 @@ export default function Home() {
                           <span className="text-lg">
                             {memory.category.icon}
                           </span>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-gray-600">
                             {memory.category.name}
                           </span>
                         </div>
@@ -311,17 +293,9 @@ export default function Home() {
                             onClick={() =>
                               handleToggleFavorite(memory.id, memory.isFavorite)
                             }
-                            className={`h-8 w-8 p-0 ${
-                              memory.isFavorite
-                                ? "text-red-500 hover:text-red-600 hover:bg-red-50"
-                                : "text-gray-400 hover:text-red-500 hover:bg-red-50"
-                            }`}
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                           >
-                            <Heart
-                              className={`h-4 w-4 ${
-                                memory.isFavorite ? "fill-current" : ""
-                              }`}
-                            />
+                            <Heart className="h-4 w-4 fill-current" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -383,7 +357,7 @@ export default function Home() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-foreground/80 line-clamp-3">
+                      <p className="text-gray-700 line-clamp-3">
                         {memory.content}
                       </p>
                       {memory.fileUrl && (

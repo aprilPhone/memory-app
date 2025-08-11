@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,46 +8,43 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  
-  // Relations
+  id         String     @id @default(cuid())
+  name       String?
+  email      String     @unique
+  password   String
+  createdAt  DateTime   @default(now())
   categories Category[]
   memories   Memory[]
-  
+
   @@map("users")
 }
 
 model Category {
-  id     String @id @default(cuid())
-  name   String
-  color  String @default("#3B82F6") // Default blue color
-  icon   String @default("📁") // Default folder icon
-  userId String
-  
-  // Relations
+  id       String   @id @default(cuid())
+  name     String
+  color    String   @default("#3B82F6")
+  icon     String   @default("📁")
+  userId   String
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   memories Memory[]
-  
+
   @@map("categories")
 }
 
 model Memory {
-  id         String   @id @default(cuid())
-  title      String
-  content    String   @db.Text
-  type       String   // text, image, audio, document
-  fileUrl    String?
-  createdAt  DateTime @default(now())
-  categoryId String
-  userId     String
-  
-  // Relations
-  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id               String   @id @default(cuid())
+  title            String
+  content          String
+  type             String
+  fileUrl          String?
+  originalFileName String?
+  url              String?
+  isFavorite       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  categoryId       String
+  userId           String
+  category         Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("memories")
 }

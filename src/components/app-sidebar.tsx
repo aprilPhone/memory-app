@@ -1,9 +1,10 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useSession, signOut } from "next-auth/react"
-import Link from "next/link"
-import { Plus, LogOut, Settings } from "lucide-react"
+import { useEffect, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
+import Link from "next/link";
+import { Plus, LogOut, Settings } from "lucide-react";
+import { useTranslations } from "@/hooks/use-translations";
 import {
   Sidebar,
   SidebarContent,
@@ -12,72 +13,84 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 
 interface Category {
-  id: string
-  name: string
-  color: string
-  icon: string
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
   _count?: {
-    memories: number
-  }
+    memories: number;
+  };
 }
 
 export function AppSidebar() {
-  const { data: session } = useSession()
-  const [categories, setCategories] = useState<Category[]>([])
+  const { data: session } = useSession();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const { t } = useTranslations();
 
   useEffect(() => {
     if (session?.user) {
-      fetchCategories()
+      fetchCategories();
     }
-  }, [session])
+  }, [session]);
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/categories")
+      const response = await fetch("/api/categories");
       if (response.ok) {
-        const data = await response.json()
-        setCategories(data)
+        const data = await response.json();
+        setCategories(data);
       }
     } catch (error) {
-      console.error("Failed to fetch categories:", error)
+      console.error("Failed to fetch categories:", error);
     }
-  }
+  };
 
   if (!session?.user) {
-    return null
+    return null;
   }
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b p-6">
-        <h1 className="text-xl font-semibold">My Memories</h1>
-        <p className="text-sm text-muted-foreground">Welcome, {session.user.name}</p>
+        <h1 className="text-xl font-semibold">{t("nav.myMemories")}</h1>
+        <p className="text-sm text-muted-foreground">
+          {t("home.welcome")}, {session.user.name}
+        </p>
       </SidebarHeader>
-      
+
       <SidebarContent className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">Categories</h2>
+          <h2 className="text-lg font-medium">{t("nav.categories")}</h2>
           <Button asChild size="sm" variant="outline">
             <Link href="/categories/new">
               <Plus className="h-4 w-4" />
             </Link>
           </Button>
         </div>
-        
+
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link href="/" className="flex items-center gap-3">
                 <span className="text-lg">📋</span>
-                <span>All Memories</span>
+                <span>{t("nav.allMemories")}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          
+
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href="/favorites" className="flex items-center gap-3">
+                <span className="text-lg">❤️</span>
+                <span>{t("nav.favorites")}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           {categories.map((category) => (
             <SidebarMenuItem key={category.id}>
               <SidebarMenuButton asChild>
@@ -96,14 +109,14 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      
+
       <SidebarFooter className="border-t p-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link href="/settings" className="flex items-center gap-3">
                 <Settings className="h-4 w-4" />
-                <span>Settings</span>
+                <span>{t("nav.settings")}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -113,11 +126,11 @@ export function AppSidebar() {
               className="flex items-center gap-3 text-red-600 hover:text-red-700"
             >
               <LogOut className="h-4 w-4" />
-              <span>Sign Out</span>
+              <span>{t("nav.signOut")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
